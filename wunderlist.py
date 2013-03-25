@@ -4,6 +4,7 @@ import httplib2 as http
 import json
 from urlparse import urlparse
 
+import gdata.calendar
 import gdata.calendar.data
 import gdata.calendar.client
 import gdata.acl.data
@@ -14,6 +15,8 @@ import string
 import time
 
 import getpass
+
+from random import randint
 
 class Wunderlist:
 	
@@ -79,7 +82,7 @@ class gCalendar:
 		# feed that holds all the batch rquest entries
 		self.request_feed = gdata.calendar.data.CalendarEventFeed()
 
-	def InsertSingleEvent(self, title, content='', start_time=None, end_time=None, where=''):
+	def InsertSingleEvent(self, title, content='', start_time=None, end_time=None, uid='', where=''):
 		event = gdata.calendar.data.CalendarEventEntry()
 		event.title = atom.data.Title(text=title)
 		event.content = atom.data.Content(text=content)
@@ -93,15 +96,28 @@ class gCalendar:
 		print 'New event inserted'
 		return new_event
 
-	def addEventToBatch(self, title, content='', start_time=None, end_time=None, where=''):
+#	def getEventById(self, uid):
+#		eventUrl = "http://www.google.com/calendar/feeds/"+self.calId+"/"+uid
+#		event = self.cal_client.get_calendar_entry(eventUrl, desired_class=gdata.calendar.data.CalendarEventEntry)
+#
+#		print(event)
+
+	def removeEventBatch(self, deleteEntry):
+		deleteEntry.batch_id = gdata.data.BatchId(text='delete-request')
+		self.request_feed.AddDelete(entry=deleteEntry)
+
+	def addEventToBatch(self, title, content='', start_time=None, end_time=None, uid='', where=''):
 		event = gdata.calendar.data.CalendarEventEntry()
 		event.title = atom.data.Title(text=title)
 		event.content = atom.data.Content(text=content)
 		event.where.append(gdata.calendar.data.CalendarWhere(value=where))
+		
+		event.uid = gdata.calendar.data.IcalUIDProperty(value=uid)
 
 		event.when.append(gdata.calendar.data.When(start=start_time, end=end_time))
 
 		event.batch_id = gdata.data.BatchId(text='insert-request')
+
 		self.request_feed.AddInsert(entry=event)
 
 		#print 'New event inserted'
@@ -109,6 +125,8 @@ class gCalendar:
 	def sendBatchRequest(self):
 		calUrl = "http://www.google.com/calendar/feeds/"+self.calId+"/private/full/batch"
 		response_feed = self.cal_client.ExecuteBatch(self.request_feed, calUrl)
+
+		#print(response_feed)
 
 	def getWunderlistCalendar(self):
 		feed = self.cal_client.GetAllCalendarsFeed()
@@ -119,7 +137,7 @@ class gCalendar:
 def main():
 	# parse command line options
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "", ["gUser=", "wUser="])
+		opts, args = getopt.getopt(sys.argv[1:], "", ["gUser=", "wUser=", "gPwd=", "wPwd="])
 	except getopt.error, msg:
 		print ('python wunderlist.py --gUser [gUsername] --wUser [wUsername]')
 		sys.exit(2)
@@ -135,12 +153,18 @@ def main():
 			gUser = a
 		elif o == "--wUser":
 			wUser = a
+		if o == "--gPwd":
+			gPw = a
+		elif o == "--wPwd":
+			wPw = a
 
 	# ask for passwords
-	print("Your Wunderlist Password Please")
-	wPw = getpass.getpass()
-	print("Your Google Password Please")
-	gPw = getpass.getpass()
+	if wPw == "":
+		print("Your Wunderlist Password Please")
+		wPw = getpass.getpass()
+	if gPw == "":
+		print("Your Google Password Please")
+		gPw = getpass.getpass()
 
 	if gUser == '' or gPw == '' or wUser == '' or wPw == '':
 		print ('python wunderlist.py --gUser [gUsername] --wUser [wUsername]')
@@ -156,10 +180,14 @@ def main():
 
 	for todo in data:
 		if todo['due_date'] is not None:
-			cal.addEventToBatch(todo['title'], '', todo['due_date'], todo['due_date'])
+			content = ''
+			if todo['note'] is not None:
+				content = todo['note']
+			cal.addEventToBatch(todo['title'], content, todo['due_date'], todo['due_date'], todo['id'])
 
 	cal.sendBatchRequest()
 
+	
 if __name__ == '__main__':
 	main()
 
