@@ -74,7 +74,9 @@ class Wunderlist:
 		return self.getData(self.listsPath)
 
 class gCalendar3:
-	def __init__(self):
+	def __init__(self, deleteD):
+		self.deleteDone = deleteD
+
 		FLAGS = gflags.FLAGS
 		flow = OAuth2WebServerFlow(client_id='258727566501-7gjl9a4e5pngvmluuhf8j3ke075v7o6b.apps.googleusercontent.com', client_secret='lyTD_f0YVOUdQG6huDmfmN0d', scope='https://www.googleapis.com/auth/calendar', user_agent='WunderlistPie/0.1')
 		storage = Storage('calendar.dat')
@@ -112,32 +114,52 @@ class gCalendar3:
 
 		return wunderlistCalendarId
 
-	def addEvent(self, title, content='', start_time=None, end_time=None, uid='', where=''):
-		newEvent = {
-		  'summary': title,
-		  #'location': where,
-		  'start': {
-			'date': start_time
-		  },
-		  'end': {
-			'date': end_time
-		  },
-		  #'id': uid,
-		  'iCalUID': uid,
-		}
-		self.newEvents[uid] = newEvent
+	def addEvent(self, title, content='', start_time=None, end_time=None, uid='', done=False):
+		if done != None and self.deleteDone:
+			pass
+		else:
+			newEvent = {
+			  'summary': title,
+			  'description': content,
+			  'start': {
+				'date': start_time
+			  },
+			  'end': {
+				'date': end_time
+			  },
+			  #'id': uid,
+			  'iCalUID': uid,
+			}
+			self.newEvents[uid] = newEvent
 
 	def submitEvents(self):
 		page_token = None
 		eventIds = self.newEvents.keys()
 		while True:
-			events = self.service.events().list(calendarId=self.wunderlistCalendarId, pageToken=page_token).execute()
+			events = self.service.events().list(calendarId=self.wunderlistCalendarId, pageToken=page_token, showDeleted=True).execute()
 			if events['items']:
 				for event in events['items']:
 					if event['iCalUID'] in eventIds:
-						if self.newEvents[event['iCalUID']]['summary'] != event['summary'] or self.newEvents[event['iCalUID']]['start'] != event['start'] or self.newEvents[event['iCalUID']]['end'] != event['end'] or self.newEvents[event['iCalUID']]['iCalUID'] != event['iCalUID']:
-							self.modifiedEvents[event['id']] = self.newEvents[event['iCalUID']]
+						if (self.newEvents[event['iCalUID']]['summary'] != event['summary'] or
+							self.newEvents[event['iCalUID']]['start'] != event['start'] or
+							self.newEvents[event['iCalUID']]['end'] != event['end'] or
+							self.newEvents[event['iCalUID']]['iCalUID'] != event['iCalUID'] or
+							('description' in event.keys() and self.newEvents[event['iCalUID']]['description'] != event['description']) or
+							('description' not in event.keys() and self.newEvents[event['iCalUID']]['description'] != '')):
+
+							self.modifiedEvents[event['id']] = event
+							self.modifiedEvents[event['id']]['summary'] = self.newEvents[event['iCalUID']]['summary']
+							self.modifiedEvents[event['id']]['start'] = self.newEvents[event['iCalUID']]['start']
+							self.modifiedEvents[event['id']]['end'] = self.newEvents[event['iCalUID']]['end']
+							self.modifiedEvents[event['id']]['description'] = self.newEvents[event['iCalUID']]['description']
+							self.modifiedEvents[event['id']]['status'] = 'confirmed'
+						elif event['status'] == 'cancelled':
+							self.modifiedEvents[event['id']] = event
+							self.modifiedEvents[event['id']]['status'] = 'confirmed'
 						del self.newEvents[event['iCalUID']]
+						
+					elif event['status'] != 'cancelled': # event is in calendar but not anymore in wunderlist with date, so we delete it
+						self.service.events().delete(calendarId=self.wunderlistCalendarId, eventId=event['id']).execute()
 			page_token = events.get('nextPageToken')
 			if not page_token:
 				break
@@ -152,13 +174,14 @@ class gCalendar3:
 def main():
 	# parse command line options
 	try:
-		opts, args = getopt.getopt(sys.argv[1:], "", ["wUser=", "wPwd="])
+		opts, args = getopt.getopt(sys.argv[1:], "d", ["wUser=", "wPwd="])
 	except getopt.error, msg:
 		print ('python wunderlist.py --wUser [wUsername]')
 		sys.exit(2)
 
 	wUser = ''
 	wPw = ''
+	deleteDone = False
 
 	# Process options
 	for o, a in opts:
@@ -166,6 +189,8 @@ def main():
 			wUser = a
 		elif o == "--wPwd":
 			wPw = a
+		elif o == "-d":
+			deleteDone = True
 
 	if wUser == '':
 		print ('python wunderlist.py --wUser [wUsername]')
@@ -186,14 +211,14 @@ def main():
 	listData = wunderlist.getListData()
 
 	# open google calendar 'Wunderlist' and add all tasks with due dates
-	cal = gCalendar3()
+	cal = gCalendar3(deleteDone)
 
 	for todo in data:
 		if todo['due_date'] is not None:
 			content = ''
 			if todo['note'] is not None:
 				content = todo['note']
-			cal.addEvent(todo['title'], content, todo['due_date'], todo['due_date'], todo['id'])
+			cal.addEvent(todo['title'], content, todo['due_date'], todo['due_date'], todo['id'], todo['completed_at'])
 
 	cal.submitEvents()
 
