@@ -10,6 +10,10 @@ Usage:
 
 <pre><code>./wunderlist.py --wUser [WunderlistUser]</code></pre>
 
+##### Dependencies
+
+You need the google client library for python. Follow the instructions at [google](https://developers.google.com/google-apps/calendar/setup) for this.
+
 ### ToDo List
 
 
