@@ -118,6 +118,7 @@ class gCalendar3:
 		if done != None and self.deleteDone:
 			pass
 		else:
+			newEndTime = end_time[:-1]+str(int(end_time[-1:])+1)
 			newEvent = {
 			  'summary': title,
 			  'description': content,
@@ -125,7 +126,7 @@ class gCalendar3:
 				'date': start_time
 			  },
 			  'end': {
-				'date': end_time
+				'date': newEndTime
 			  },
 			  #'id': uid,
 			  'iCalUID': uid,
