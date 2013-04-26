@@ -8,6 +8,7 @@ import getopt
 import sys
 import string
 import time
+import datetime
 
 import getpass
 
@@ -118,7 +119,9 @@ class gCalendar3:
 		if done != None and self.deleteDone:
 			pass
 		else:
-			newEndTime = end_time[:-1]+str(int(end_time[-1:])+1)
+			endDate = end_time.split("-")
+			newEndTime = datetime.date(int(endDate[0]), int(endDate[1]), int(endDate[2]))
+			newEndTime += datetime.timedelta(days=1)
 			newEvent = {
 			  'summary': title,
 			  'description': content,
@@ -126,7 +129,7 @@ class gCalendar3:
 				'date': start_time
 			  },
 			  'end': {
-				'date': newEndTime
+				'date': str(newEndTime)
 			  },
 			  #'id': uid,
 			  'iCalUID': uid,
