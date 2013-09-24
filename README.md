@@ -13,12 +13,3 @@ Usage:
 ##### Dependencies
 
 You need the google client library for python. Follow the instructions at [google](https://developers.google.com/google-apps/calendar/setup) for this.
-
-### ToDo List
-
-
-* ~~Move to Google Calendar API v3~~
-* ~~Update existing events~~
-* ~~Use OAuth~~
-* ~~Remove finished Tasks~~
-* ...
